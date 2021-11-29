@@ -73,6 +73,20 @@ allowRWOMultiPodAccess: "false"
 # "controller" allows to configure controller specific parameters
 controller:
 
+  healthMonitor:
+    # enabled: Enable/Disable health monitor of CSI volumes
+    # Allowed values:
+    #   true: enable checking of health condition of CSI volumes
+    #   false: disable checking of health condition of CSI volumes
+    # Default value: None
+    enabled: false
+
+    # healthMonitorInterval: Interval of monitoring volume health condition
+    # Allowed values: Number followed by unit (s,m,h)
+    # Examples: 60s, 5m, 1h
+    # Default value: 60s
+    volumeHealthMonitorInterval: 60s
+
   # volumeNamePrefix- defines a string prepended to each volume created by the CSI driver.
   # Default value: none
   # Examples: "k8s", "app1"
@@ -118,6 +132,14 @@ controller:
 
 # "node" allows to configure node specific parameters
 node:
+  healthMonitor:
+    # enabled: Enable/Disable health monitor of CSI volumes- volume usage, volume condition
+    # Allowed values:
+    #   true: enable checking of health condition of CSI volumes
+    #   false: disable checking of health condition of CSI volumes
+    # Default value: None
+    enabled: false
+
   # "node.nodeSelector" defines what nodes would be selected for pods of node daemonset
   # Leave as blank to use all nodes
   # Allowed values: map of key-value pairs
@@ -180,3 +202,27 @@ podmon:
   #    - "--leaderelection=false"
   #    - "--driver-config-params=/vxflexos-config-params/driver-config-params.yaml"
 
+# CSM module attributes
+# authorization: enable csm-authorization for RBAC
+# Deploy and configure authorization before installing driver
+# Allowed values:
+#   "true" - authorization is enabled
+#   "false" - authorization is disabled
+# Default value: "false"
+authorization:
+  enabled: false
+
+  # sidecarProxyImage: the container image used for the csm-authorization-sidecar.
+  # Default value: dellemc/csm-authorization-sidecar:v1.0.0
+  sidecarProxyImage: dellemc/csm-authorization-sidecar:v1.0.0
+
+  # proxyHost: hostname of the csm-authorization server
+  # Default value: None
+  proxyHost:
+
+  # skipCertificateValidation: certificate validation of the csm-authorization server
+  # Allowed Values:
+  #   "true" - TLS certificate verification will be skipped
+  #   "false" - TLS certificate will be verified 
+  # Default value: "true" 
+  skipCertificateValidation: true

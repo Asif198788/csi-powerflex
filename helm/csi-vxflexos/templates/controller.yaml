@@ -114,6 +114,12 @@ apiVersion: apps/v1
 metadata:
   name: {{ .Release.Name }}-controller
   namespace: {{ .Release.Namespace }}
+  {{- if hasKey .Values "authorization" }}
+  {{- if eq .Values.authorization.enabled true }}
+  annotations:
+      com.dell.karavi-authorization-proxy: "true"
+  {{ end }}
+  {{ end }}
 spec:
 {{- if gt (int .Values.controller.controllerCount) 1 }}
   strategy:
@@ -214,6 +220,8 @@ spec:
           volumeMounts:
             - name: socket-dir
               mountPath: /var/run/csi
+        {{- if hasKey .Values.controller "healthMonitor" }}
+        {{- if eq .Values.controller.healthMonitor.enabled true}}
         - name: csi-external-health-monitor-controller
           image: {{ required "Must provide the CSI external health monitor image." ( include "csi-vxflexos.healthmonitorImage" . ) }}
           imagePullPolicy: {{ .Values.imagePullPolicy }}
@@ -223,12 +231,16 @@ spec:
             - "--leader-election=true"
             - "--enable-node-watcher=true"
             - "--http-endpoint=:8080"
+            - "--monitor-interval={{ .Values.controller.healthMonitor.volumeHealthMonitorInterval | default "60s" }}"
+            - "--timeout=180s"
           env:
             - name: ADDRESS
               value: /var/run/csi/csi.sock
           volumeMounts:
             - name: socket-dir
               mountPath: /var/run/csi
+        {{- end }}
+        {{- end }}
 {{- if hasKey .Values "vgsnapshotter" }}
 {{- if eq .Values.vgsnapshotter.enabled true }}
         - name: vg-snapshotter
@@ -279,6 +291,37 @@ spec:
               mountPath: /var/run/csi
 {{- end }}
 {{- end }}
+{{- if hasKey .Values "authorization" }}
+{{- if eq .Values.authorization.enabled true }}
+        - name: karavi-authorization-proxy
+          imagePullPolicy: Always
+          image: {{ required "Must provide the authorization sidecar container image." .Values.authorization.sidecarProxyImage }}
+          env:
+            - name: PROXY_HOST
+              value: "{{ .Values.authorization.proxyHost }}"
+            - name: INSECURE
+              value: "{{ .Values.authorization.skipCertificateValidation }}"
+            - name: PLUGIN_IDENTIFIER
+              value: powerflex
+            - name: ACCESS_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: proxy-authz-tokens
+                  key: access
+            - name: REFRESH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: proxy-authz-tokens
+                  key: refresh
+          volumeMounts:
+            - name: karavi-authorization-config
+              mountPath: /etc/karavi-authorization/config
+            - name: proxy-server-root-certificate
+              mountPath: /etc/karavi-authorization/root-certificates
+            - name: vxflexos-config-params
+              mountPath: /etc/karavi-authorization
+{{- end }}
+{{- end }}
         - name: driver
           image: "{{ required "Must provide the driver image repository." .Values.images.driverRepository }}/{{ .Chart.Name }}:v{{ .Values.version }}"
           imagePullPolicy: {{ .Values.imagePullPolicy }}
@@ -298,6 +341,12 @@ spec:
               value: "{{ required "Enable this to have CSI ListVolumes include snapshots" .Values.enablelistvolumesnapshot }}"
             - name: SSL_CERT_DIR
               value: /certs
+            {{- if hasKey .Values.controller "healthMonitor" }}
+            {{- if eq .Values.controller.healthMonitor.enabled true}}
+            - name: X_CSI_HEALTH_MONITOR_ENABLED
+              value: "{{ .Values.controller.healthMonitor.enabled }}"
+            {{- end }}
+            {{- end }}
           volumeMounts:
             - name: socket-dir
               mountPath: /var/run/csi
@@ -319,6 +368,16 @@ spec:
         - name: vxflexos-config-params
           configMap:
             name: {{ .Release.Name }}-config-params
+        {{- if hasKey .Values "authorization" }}
+        {{- if eq .Values.authorization.enabled true }}
+        - name: karavi-authorization-config
+          secret:
+            secretName: karavi-authorization-config
+        - name: proxy-server-root-certificate
+          secret:
+            secretName: proxy-server-root-certificate
+        {{ end }}
+        {{ end }}
 {{- if ge (int .Values.certSecretCount) 1 }}
         - name: certs
           projected:
